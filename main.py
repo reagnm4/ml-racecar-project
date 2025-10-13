@@ -56,11 +56,14 @@ while True:
             car_speed -= friction
         elif car_speed < 0:
             car_speed += friction
-
+            
+    car_angle = ((car_angle + 180) % 360) - 180
     car_speed = max(-max_speed / 2, min(max_speed, car_speed))
     rad = math.radians(car_angle)
     car_x += math.cos(rad) * car_speed
     car_y -= math.sin(rad) * car_speed
+    car_x = max(0, min(info.current_w, car_x))
+    car_y = max(0, min(info.current_h, car_y))
 
     screen.blit(track_surface, (0, 0))
 
@@ -72,8 +75,15 @@ while True:
     indicator_color = (0, 255, 0) if on_track else (0, 0, 255)
     pygame.draw.circle(screen, indicator_color, (int(car_x), int(car_y)), 5)
 
+    speed_text = font.render(f"Speed: {car_speed:.2f}", True, (255, 255, 255))
+    angle_text = font.render(f"Angle: {car_angle:.1f}°", True, (255, 255, 255))
+    track_text = font.render(f"On Track: {on_track}", True, (255, 255, 255))
     fps_text = font.render(f"FPS: {int(clock.get_fps())}", True, (255, 255, 255))
+    
     screen.blit(fps_text, (10, 10))
+    screen.blit(speed_text, (10, 35))
+    screen.blit(angle_text, (10, 55))
+    screen.blit(track_text, (10, 75))
     
     pygame.display.flip()
     clock.tick(60)
