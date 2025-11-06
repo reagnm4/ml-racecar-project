@@ -1,6 +1,7 @@
 import pygame
 import sys
 import math
+import numpy as np
 
 class RaceEnv:
     def __init__(self):
@@ -22,6 +23,10 @@ class RaceEnv:
         self.rotation_speed = 6
         self.friction = 0.05
 
+        self.num_sensors = 5
+        self.sensor_angles = [-45, -25, 0, 25, 45]
+        self.sensor_max_distance = 300
+
         self.reset()
 
     def reset(self):
@@ -39,6 +44,15 @@ class RaceEnv:
         track_color = (127, 127, 127)
         tolerance = 20
         return all(abs(color[i] - track_color[i]) < tolerance for i in range(3))
+    
+    def cast_sensor(self, angle_offset):
+        angle = math.radians(self.car_angle + angle_offset)
+        for dist in range(0, self.sensor_max_distance, 5):
+            x = int(self.car_x + math.cos(angle) * dist)
+            y = int(self.car_y - math.sin(angle) * dist)
+            if not self.is_on_track(x, y):
+                return dist / self.sensor_max_distance
+        return 1.0
     
     def step(self, action):
         if action == 1:
@@ -66,21 +80,38 @@ class RaceEnv:
         self.car_x = max(0, min(self.info.current_w, self.car_x))
         self.car_y = max(0, min(self.info.current_h, self.car_y))
 
+        reward = 0.0
         on_track = self.is_on_track(self.car_x, self.car_y)
-        reward = 1 if on_track else -1
-        done = False 
+        if on_track:
+            reward += 0.1 * self.car_speed
+        else:
+            reward -= 2.0
+        
+        self.prev_angle = getattr(self, "prev_angle", self.car_angle)
+        angle_change = abs(self.car_angle - self.prev_angle)
+        reward -= 0.01 * angle_change
+        self.prev_angle = self.car_angle
+
+        dx = self.car_x - getattr(self, "prev_x", self.car_x)
+        dy = self.car_y - getattr(self, "prev_y", self.car_y)
+        forward_progress = math.sqrt(dx**2 + dy**2)
+        reward += 0.05 * forward_progress
+        self.prev_x, self.prev_y = self.car_x, self.car_y
 
         state = self.get_state(on_track)
+
+        done = False
+        if not on_track:
+            done = True
         return state, reward, done
     
     def get_state(self, on_track):
-        return {
-            "x": self.car_x,
-            "y": self.car_y,
-            "angle": self.car_angle,
-            "speed": self.car_speed,
-            "on_track": on_track
-        }
+        sensors = np.array([self.cast_sensor(a) for a in self.sensor_angles], dtype=np.float32)
+        other = np.array([
+            self.car_speed / self.max_speed,
+            self.car_angle / 180
+        ], dtype=np.float32)
+        return np.concatenate((sensors, other))
     
     def render(self):
         self.screen.blit(self.track_surface, (0, 0))
@@ -100,6 +131,13 @@ class RaceEnv:
         self.screen.blit(speed_text, (10, 35))
         self.screen.blit(angle_text, (10, 55))
         self.screen.blit(on_track_text, (10, 75))
+
+        for a in self.sensor_angles:
+            dist = self.cast_sensor(a) * self.sensor_max_distance
+            rad = math.radians(self.car_angle + a)
+            end_x = self.car_x + math.cos(rad) * dist
+            end_y = self.car_y - math.sin(rad) * dist
+            pygame.draw.line(self.screen, (255, 0, 0), (self.car_x, self.car_y), (end_x, end_y), 1)
 
         pygame.display.flip()
         self.clock.tick(60)
