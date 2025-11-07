@@ -2,6 +2,7 @@ import pygame
 import sys
 import math
 import numpy as np
+from gymnasium import spaces
 
 class RaceEnv:
     def __init__(self):
@@ -27,6 +28,9 @@ class RaceEnv:
         self.sensor_angles = [-45, -25, 0, 25, 45]
         self.sensor_max_distance = 300
 
+        self.observation_space = spaces.Box(low=0, high=1, shape=(7,), dtype=np.float32)
+        self.action_space = spaces.Discrete(5)
+
         self.reset()
 
     def reset(self):
@@ -35,7 +39,7 @@ class RaceEnv:
         self.car_angle = 0       
         self.car_speed = 0
         state = self.get_state(on_track=True)
-        return state
+        return state, {}
 
     def is_on_track(self, x, y):
         if x < 0 or y < 0 or x >= self.track_surface.get_width() or y >= self.track_surface.get_height():
@@ -100,10 +104,11 @@ class RaceEnv:
 
         state = self.get_state(on_track)
 
-        done = False
-        if not on_track:
-            done = True
-        return state, reward, done
+        terminated = True
+        truncated = False
+        info = {}
+
+        return state, reward, terminated, truncated, info
     
     def get_state(self, on_track):
         sensors = np.array([self.cast_sensor(a) for a in self.sensor_angles], dtype=np.float32)
@@ -143,29 +148,43 @@ class RaceEnv:
         self.clock.tick(60)
 
 if __name__ == "__main__":
+    # env = RaceEnv()
+    # running = True
+    # while running:
+    #     for event in pygame.event.get():
+    #         if event.type == pygame.QUIT:
+    #             running = False
+    #         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+    #             running = False
+
+    #     keys = pygame.key.get_pressed()
+    #     if keys[pygame.K_UP]:
+    #         env.car_speed += env.acceleration
+    #     if keys[pygame.K_DOWN]:
+    #         env.car_speed -= env.acceleration
+    #     if keys[pygame.K_LEFT]:
+    #         env.car_angle += env.rotation_speed
+    #     if keys[pygame.K_RIGHT]:
+    #         env.car_angle -= env.rotation_speed
+
+    #     env.car_angle %= 360
+    #     env.step(0)
+    #     env.render()
+
+    # pygame.quit()
+    # sys.exit()
     env = RaceEnv()
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                running = False
 
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_UP]:
-            env.car_speed += env.acceleration
-        if keys[pygame.K_DOWN]:
-            env.car_speed -= env.acceleration
-        if keys[pygame.K_LEFT]:
-            env.car_angle += env.rotation_speed
-        if keys[pygame.K_RIGHT]:
-            env.car_angle -= env.rotation_speed
+    obs, info = env.reset()
 
-        env.car_angle %= 360
-        env.step(0)
-        env.render()
+    for _ in range(10):
+        action = env.action_space.sample()  # random action
+        obs, reward, terminated, truncated, info = env.step(action)
+        print("Obs:", obs, "Reward:", reward)
+
+        env.render()  # optional – shows your car & sensors
+        if terminated or truncated:
+            obs, info = env.reset()
 
     pygame.quit()
     sys.exit()
-    
