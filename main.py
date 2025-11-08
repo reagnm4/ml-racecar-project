@@ -183,6 +183,13 @@ class RaceEnv(gym.Env):
         indicator_color = (0, 255, 0) if self.is_on_track(self.car_x, self.car_y) else (255, 0, 0)
         pygame.draw.circle(self.screen, indicator_color, (int(self.car_x), int(self.car_y)), 4)
 
+        for a in self.sensor_angles:
+            dist = self.cast_sensor(a) * self.sensor_max_distance
+            rad = math.radians(self.car_angle + a)
+            end_x = self.car_x + math.cos(rad) * dist
+            end_y = self.car_y - math.sin(rad) * dist
+            pygame.draw.line(self.screen, (255, 0, 0), (self.car_x, self.car_y), (end_x, end_y), 1)
+
         pygame.display.flip()
         self.clock.tick(60)
 
